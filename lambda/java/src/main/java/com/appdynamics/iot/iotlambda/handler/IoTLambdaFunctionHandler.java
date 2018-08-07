@@ -26,10 +26,15 @@ import org.apache.commons.io.IOUtils;
 
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.charset.Charset;
 import java.io.IOException;
+import java.nio.charset.Charset;
 import java.lang.Thread;
-import java.util.Random;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.text.ParseException;
+import java.time.*;
+import java.util.*;
+import java.util.Map.Entry;
 
 import com.appdynamics.iot.Instrumentation;
 import com.appdynamics.iot.AgentConfiguration;
@@ -63,7 +68,7 @@ public class IoTLambdaFunctionHandler implements RequestStreamHandler {
     	
         Instrumentation.start(agentConfig, deviceInfo, versionInfo);
         
-        this.AddInstrumentationEvent(request.getDeviceEvent().getButtonClicked().getClickType() + "CLICK", request.getDeviceEvent().getButtonClicked().getClickType(), System.currentTimeMillis(), System.currentTimeMillis() + delayInt);
+        this.AddInstrumentationEvent(request.getDeviceEvent().getButtonClicked().getClickType() + "CLICK", request.getDeviceEvent().getButtonClicked().getClickType(), System.currentTimeMillis(), System.currentTimeMillis() + delayInt, Optional.empty());
         
         long voteCastEventStart = System.currentTimeMillis();    	       
     	
@@ -89,18 +94,49 @@ public class IoTLambdaFunctionHandler implements RequestStreamHandler {
         	Instrumentation.addErrorEvent(e, Instrumentation.Severity.ALERT);
         }
         
-        long voteCastEventEnd = System.currentTimeMillis() + delayInt + 1000;              
+        long voteCastEventEnd = System.currentTimeMillis() + delayInt + 1000;                    
         
-        AddInstrumentationEvent("Vote Cast", "Vote Cast", voteCastEventStart, voteCastEventEnd);              
+        
+        HashMap<String, Object> voteCast = new HashMap<String, Object>();
+        voteCast.put("VoteRecipient", vote.getVoteRecipient());
+
+        try {
+        	Date d = Date.from(Instant.parse(vote.getVoteDatetime()));
+            voteCast.put("VoteDatetime", d);
+        } catch (Exception pe) {
+        	Instrumentation.addErrorEvent(pe, Instrumentation.Severity.ALERT);
+        }
+        
+        
+        AddInstrumentationEvent("Vote Cast", "Vote Cast", voteCastEventStart, voteCastEventEnd, Optional.of(voteCast));              
         
         Instrumentation.sendAllEvents();
         
         outputStream.write(retval.getBytes(Charset.forName("UTF-8")));
     }
     
-    private void AddInstrumentationEvent(String eventName, String eventDesc, long startTime, long duration) {
-    	CustomEvent.Builder eventBuilder = CustomEvent.builder(eventName, eventDesc);
-    	CustomEvent event = eventBuilder.withTimestamp(startTime).withDuration(duration).build();
+    private void AddInstrumentationEvent(String eventName, String eventDesc, long startTime, long duration, Optional<HashMap<String, Object>> props) {
+    	CustomEvent.Builder eventBuilder = CustomEvent.builder(eventName, eventDesc).withTimestamp(startTime).withDuration(duration);
+    	
+    	HashMap<String, Object> properties = props.isPresent() ? props.get() : null;
+    	
+    	if (properties != null) {
+    		Iterator<Entry<String, Object>> it = properties.entrySet().iterator();
+    		while (it.hasNext())
+    		{
+    			Entry<String, Object> entry = it.next();
+    			if (entry.getValue() instanceof Date) {
+    				eventBuilder.addDateProperty(entry.getKey(), (Date) entry.getValue());    				
+    			}
+    			
+    			if (entry.getValue() instanceof String)
+    			{
+    				eventBuilder.addStringProperty(entry.getKey(), entry.getValue().toString());
+    			}
+    		}
+    	}
+    	
+    	CustomEvent event = eventBuilder.build();
     	
     	Instrumentation.addEvent(event);
     }
