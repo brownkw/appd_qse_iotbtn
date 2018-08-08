@@ -63,7 +63,7 @@ public class IoTLambdaFunctionHandler implements RequestStreamHandler {
     	IoTEnterpriseButtonRequest request = gson.fromJson(str, IoTEnterpriseButtonRequest.class);
     	
     	AgentConfiguration agentConfig = IoTSDKHelper.ConfigureAgent();
-        DeviceInfo deviceInfo = IoTSDKHelper.ConfigureDevice("AWS IoT Button Enterprise", "AWS IoT Button Enterprise", request.getDeviceInfo().getDeviceId());
+        DeviceInfo deviceInfo = IoTSDKHelper.ConfigureDevice("AWS IoT", "AWS IoT Button", request.getDeviceInfo().getDeviceId());
         VersionInfo versionInfo = IoTSDKHelper.ConfigureDeviceVersion("1.0", "1.0", "1.0", "1.0");
     	
         Instrumentation.start(agentConfig, deviceInfo, versionInfo);
