@@ -3,9 +3,6 @@
  */
 package com.appdynamics.iot.iotlambda.helpers;
 
-import java.util.Properties;
-import java.util.ResourceBundle;
-import java.io.InputStream;
 import java.io.IOException;
 
 import com.appdynamics.iot.AgentConfiguration;
@@ -24,7 +21,7 @@ public class IoTSDKHelper {
 	 */
 	public static AgentConfiguration ConfigureAgent() throws IOException {			
 		
-		final String APP_KEY = "AD-AAB-AAK-YBY";
+		final String APP_KEY = "AD-AAB-AAK-ZMN";
 		final String APP_COLLECTOR_URL = "https://iot-col.eum-appdynamics.com";
 		
 		AgentConfiguration.Builder builder = AgentConfiguration.builder();
