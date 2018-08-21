@@ -16,6 +16,7 @@ import com.amazonaws.services.dynamodbv2.document.Table;
 import com.appdynamics.iot.iotlambda.helpers.IoTSDKHelper;
 
 import com.appdynamics.iot.iotlambda.model.IoTButtonRequest;
+import com.appdynamics.iot.iotlambda.model.IoTButtonRequest2;
 import com.appdynamics.iot.iotlambda.model.IoTEnterpriseButtonRequest;
 import com.appdynamics.iot.iotlambda.model.IoTButtonVote;
 
@@ -60,15 +61,18 @@ public class IoTLambdaFunctionHandler implements RequestStreamHandler {
     	// Read the input stream and cast to IoTEnterpriseButtonRequest object
     	String str = IOUtils.toString(inputStream, "UTF-8");    	
     	Gson gson = new GsonBuilder().create();
-    	IoTEnterpriseButtonRequest request = gson.fromJson(str, IoTEnterpriseButtonRequest.class);
+    	//IoTEnterpriseButtonRequest request = gson.fromJson(str, IoTEnterpriseButtonRequest.class);
+    	IoTButtonRequest2 request = gson.fromJson(str, IoTButtonRequest2.class);
     	
     	AgentConfiguration agentConfig = IoTSDKHelper.ConfigureAgent();
-        DeviceInfo deviceInfo = IoTSDKHelper.ConfigureDevice("AWS IoT", "AWS IoT Button", request.getDeviceInfo().getDeviceId());
+        //DeviceInfo deviceInfo = IoTSDKHelper.ConfigureDevice("AWS IoT", "AWS IoT Button", request.getDeviceInfo().getDeviceId());
+    	DeviceInfo deviceInfo = IoTSDKHelper.ConfigureDevice("AWS IoT", "AWS IoT Button", request.getSerialNumber());
         VersionInfo versionInfo = IoTSDKHelper.ConfigureDeviceVersion("1.0", "1.0", "1.0", "1.0");
     	
         Instrumentation.start(agentConfig, deviceInfo, versionInfo);
         
-        this.AddInstrumentationEvent(request.getDeviceEvent().getButtonClicked().getClickType() + "CLICK", request.getDeviceEvent().getButtonClicked().getClickType(), System.currentTimeMillis(), System.currentTimeMillis() + delayInt, Optional.empty());
+        //this.AddInstrumentationEvent(request.getDeviceEvent().getButtonClicked().getClickType() + "CLICK", request.getDeviceEvent().getButtonClicked().getClickType(), System.currentTimeMillis(), System.currentTimeMillis() + delayInt, Optional.empty());
+        this.AddInstrumentationEvent(request.getClickType() + "CLICK", request.getClickType(), System.currentTimeMillis(), System.currentTimeMillis() + delayInt, Optional.empty());
         
         long voteCastEventStart = System.currentTimeMillis();    	       
     	
@@ -78,8 +82,11 @@ public class IoTLambdaFunctionHandler implements RequestStreamHandler {
         this.InitDB();
         
         IoTButtonVote vote = new IoTButtonVote();
-        vote.setButtonId(request.getDeviceInfo().getDeviceId());
-        vote.setVoteRecipient(request.getPlacementInfo().getAttributes().getVote());
+        //vote.setButtonId(request.getDeviceInfo().getDeviceId());
+        //vote.setVoteRecipient(request.getPlacementInfo().getAttributes().getVote());
+        vote.setButtonId(request.getSerialNumber());
+        vote.setVoteRecipient(request.getVoteRecipient());
+        vote.setVoteBoard(request.getBoardNumber());
         
         String retval = "";
         
@@ -96,9 +103,19 @@ public class IoTLambdaFunctionHandler implements RequestStreamHandler {
         
         long voteCastEventEnd = System.currentTimeMillis() + delayInt + 1000;                    
         
+        logger.log("Vote Recipient: " + vote.getVoteRecipient());
+        logger.log("Vote Board #: " + vote.getVoteBoard());
         
         HashMap<String, Object> voteCast = new HashMap<String, Object>();
         voteCast.put("VoteRecipient", vote.getVoteRecipient());
+        voteCast.put("VoteBoard", vote.getVoteBoard());
+        
+        // Not "counting" any of Dali's votes. 
+        if (vote.getVoteRecipient() == "Dali Rajic") {        	
+        	voteCast.put("CountTheVote", false);
+        } else {
+        	voteCast.put("CountTheVote", true);
+        }
 
         try {
         	Date d = Date.from(Instant.parse(vote.getVoteDatetime()));
@@ -108,7 +125,7 @@ public class IoTLambdaFunctionHandler implements RequestStreamHandler {
         }
         
         
-        AddInstrumentationEvent("Vote Cast", "Vote Cast", voteCastEventStart, voteCastEventEnd, Optional.of(voteCast));              
+        this.AddInstrumentationEvent("Vote Cast", "Vote Cast", voteCastEventStart, voteCastEventEnd, Optional.of(voteCast));              
         
         Instrumentation.sendAllEvents();
         
@@ -129,9 +146,20 @@ public class IoTLambdaFunctionHandler implements RequestStreamHandler {
     				eventBuilder.addDateProperty(entry.getKey(), (Date) entry.getValue());    				
     			}
     			
-    			if (entry.getValue() instanceof String)
-    			{
+    			if (entry.getValue() instanceof Integer || entry.getValue() instanceof Long) {
+    				eventBuilder.addLongProperty(entry.getKey(), (long) entry.getValue());
+    			}
+    			
+    			if (entry.getValue() instanceof String) {
     				eventBuilder.addStringProperty(entry.getKey(), entry.getValue().toString());
+    			}
+    			
+    			if (entry.getValue() instanceof Boolean) {
+    				eventBuilder.addBooleanProperty(entry.getKey(), (boolean) entry.getValue());
+    			}
+    			
+    			if (entry.getValue() instanceof Double) {
+    				eventBuilder.addDoubleProperty(entry.getKey(), (double) entry.getValue());
     			}
     		}
     	}
@@ -139,43 +167,7 @@ public class IoTLambdaFunctionHandler implements RequestStreamHandler {
     	CustomEvent event = eventBuilder.build();
     	
     	Instrumentation.addEvent(event);
-    }
-	
-    /*@Override
-    public String handleRequest(Object input, Context context)  {
-        AgentConfiguration agentConfig = IoTSDKHelper.ConfigureAgent();
-        DeviceInfo deviceInfo = IoTSDKHelper.ConfigureDevice("AWS IoT Button", "AWS IoT Button (Regular)", "12345");
-        VersionInfo versionInfo = IoTSDKHelper.ConfigureDeviceVersion("1.0", "1.0", "1.0", "1.0");
-    	
-        Instrumentation.start(agentConfig, deviceInfo, versionInfo);
-        
-        CustomEvent.Builder voteCastEvent = CustomEvent.builder("Vote Cast", "Vote cast");
-        long voteCastEventStart = System.currentTimeMillis();
-        
-    	LambdaLogger logger = context.getLogger();       	
-        
-        //logger.log("Input: " + input.toString());
-        this.InitDB();
-        
-        IoTButtonVote vote = new IoTButtonVote();
-        vote.setButtonId("12345");
-        vote.setVoteRecipient("Candidate01");
-        
-        String retval = "";
-        
-        try {
-        	Item dbItem = new Item().withPrimaryKey("VoteRecipient", vote.getVoteRecipient(), "VoteDatetime", vote.getVoteDatetime()).with("Id", vote.getId()).with("ButtonId", vote.getButtonId()).with("Str", input.toString());
-        	PutItemOutcome outcome = table.putItem(dbItem);
-        	
-        	retval = outcome.getPutItemResult().toString();
-        } catch (Exception e) {
-        	logger.log("Could not put item: " + e.getMessage());
-        	retval = e.getMessage();
-        }
-        
-        return retval;
-        
-    }*/
+    }	    
     
     /*
      * Inits the AWS DB instance

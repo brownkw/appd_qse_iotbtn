@@ -19,6 +19,7 @@ public class IoTButtonVote {
 	private String ButtonId;
 	private String VoteRecipient;
 	private String VoteDatetime;
+	private String VoteBoard;	
 	
 	/**
 	 * Creates an instance of the IoTButtonVote object
@@ -79,5 +80,19 @@ public class IoTButtonVote {
 		DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'"); // Quoted "Z" to indicate UTC, no timezone offset
 		df.setTimeZone(tz);
 		VoteDatetime = df.format(new Date());
+	}
+
+	/**
+	 * @return the voteBoard
+	 */
+	public String getVoteBoard() {
+		return VoteBoard;
+	}
+
+	/**
+	 * @param voteBoard the voteBoard to set
+	 */
+	public void setVoteBoard(String voteBoard) {
+		VoteBoard = voteBoard;
 	}	
 }
